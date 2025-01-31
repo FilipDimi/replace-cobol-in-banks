@@ -14,6 +14,7 @@ const (
 	dbSource = "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable"
 )
 
+var testStore Store
 var testQueries *Queries
 
 func TestMain(m *testing.M) {
