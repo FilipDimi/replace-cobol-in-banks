@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"simplebank/api"
-	"simplebank/util"
+
+	"github.com/techschool/simplebank/api"
+	"github.com/techschool/simplebank/util" // Use the full module path
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	db "github.com/techschool/simplebank/db/sqlc"
@@ -22,9 +23,12 @@ func main() {
 	}
 
 	store := db.NewStore(conn)
-	server := api.NewServer(store)
+	server, err := api.NewServer(config, store)
+	if err != nil {
+		log.Fatal("cannot create server")
+	}
 
-	err = server.Start(config.ServerAddress)
+	err = server.Start(config.HTTPServerAddress)
 	if err != nil {
 		log.Fatal("cannot start server:", err)
 	}
