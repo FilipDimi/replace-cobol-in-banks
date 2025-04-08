@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"log"
+	"net"
+	"simplebank/gapi"
+	"simplebank/pb"
+	"simplebank/util"
 
-	"github.com/techschool/simplebank/api"
-	"github.com/techschool/simplebank/util" // Use the full module path
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	db "github.com/techschool/simplebank/db/sqlc"
@@ -23,13 +27,28 @@ func main() {
 	}
 
 	store := db.NewStore(conn)
-	server, err := api.NewServer(config, store)
+	runGrpcServer(config, store)
+}
+
+func runGrpcServer(config util.Config, store db.Store) {
+	server, err := gapi.NewServer(config, store)
 	if err != nil {
 		log.Fatal("cannot create server")
 	}
 
-	err = server.Start(config.HTTPServerAddress)
+	grpcLogger := grpc.UnaryInterceptor(gapi.GrpcLogger)
+	grpcServer := grpc.NewServer(grpcLogger)
+	pb.RegisterSimpleBankServer(grpcServer, server)
+	reflection.Register(grpcServer)
+
+	listener, err := net.Listen("tcp", config.GRPCServerAddress)
 	if err != nil {
-		log.Fatal("cannot start server:", err)
+		log.Fatal("cannot create lsitener")
+	}
+
+	log.Printf("start gRPC server at %s", listener.Addr().String())
+	err = grpcServer.Serve(listener)
+	if err != nil {
+		log.Fatal("cannot start gRPC server")
 	}
 }
