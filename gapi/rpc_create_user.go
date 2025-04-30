@@ -4,7 +4,10 @@ import (
 	"context"
 	"simplebank/pb"
 	"simplebank/util"
+	"simplebank/worker"
+	"time"
 
+	"github.com/hibiken/asynq"
 	db "github.com/techschool/simplebank/db/sqlc"
 	"github.com/techschool/simplebank/val"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -37,9 +40,27 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to create user: %s", err)
 	}
+
+	taskPayload := &worker.PayloadSendVerifyEmail{
+		Username: user.Username,
+	}
+
+	// TODO: use db transa
+	opts := []asynq.Option{
+		asynq.MaxRetry(10),
+		asynq.ProcessIn(10 * time.Second),
+		asynq.Queue(worker.QueueCritical),
+	}
+	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to distribute task to send email: %s", err)
+	}
+
 	rsp := &pb.CreateUserResponse{
 		User: convertUser(user),
 	}
+	
 	return rsp, nil
 }
 
